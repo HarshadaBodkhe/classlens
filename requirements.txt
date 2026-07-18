@@ -3,6 +3,8 @@ streamlit # for web app
 # Utilities
 numpy
 pandas
+opencv-contrib-python
+opencv-python
 scikit-learn #SVM -- face recognition
 #Image recognition -- face detection 
 dlib-bin
