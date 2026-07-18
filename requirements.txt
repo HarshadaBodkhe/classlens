@@ -3,14 +3,15 @@ streamlit # for web app
 # Utilities
 numpy
 pandas
-opencv-contrib-python
-opencv-python
 scikit-learn #SVM -- face recognition
 #Image recognition -- face detection 
 dlib-bin
 # face shape detection -- vector embeddings
 git+https://github.com/ageitgey/face_recognition_models
 setuptools<70.0.0
+
+# OpenCV (choose one)
+opencv-contrib-python
 
 supabase
 bcrypt 
