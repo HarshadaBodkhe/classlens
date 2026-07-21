@@ -1,18 +1,18 @@
-
-
 import dlib
 import numpy as np
 import face_recognition_models
-from sklearn.svm import SVC
 import streamlit as st
 
 from src.database.db import get_all_students
 
 
+# ---------------------------
+# Load Dlib Models
+# ---------------------------
+
 @st.cache_resource
 def load_dlib_models():
-    detector = dlib.get_frontal_face_detector() 
-
+    detector = dlib.get_frontal_face_detector()
 
     sp = dlib.shape_predictor(
         face_recognition_models.pose_predictor_model_location()
@@ -24,83 +24,109 @@ def load_dlib_models():
 
     return detector, sp, facerec
 
+
+# ---------------------------
+# Generate Face Embeddings
+# ---------------------------
+
 def get_face_embeddings(image_np):
     detector, sp, facerec = load_dlib_models()
+
     faces = detector(image_np, 1)
 
-    encodings= []
+    encodings = []
 
     for face in faces:
         shape = sp(image_np, face)
-        face_descriptor = facerec.compute_face_descriptor(image_np, shape, 1) #128 embedding
+
+        face_descriptor = facerec.compute_face_descriptor(
+            image_np,
+            shape,
+            1
+        )
 
         encodings.append(np.array(face_descriptor))
+
     return encodings
 
+
+# ---------------------------
+# Load Registered Students
+# ---------------------------
+
 @st.cache_resource
-def get_trained_model():
-    X = []
-    y = []
+def get_registered_students():
 
+    students = get_all_students()
 
-    student_db = get_all_students()
+    registered = []
 
-    if not student_db:
-        return None
-    
-    for student in student_db:
-        embedding = student.get('face_embedding')
+    for student in students:
+
+        embedding = student.get("face_embedding")
+
         if embedding:
-            X.append(np.array(embedding))
-            y.append(student.get('student_id'))
 
-    if len(X) ==0:
-        return 0
-    
-    clf = SVC(kernel='linear', probability=True, class_weight='balanced')
+            registered.append({
+                "student_id": student["student_id"],
+                "embedding": np.array(embedding)
+            })
 
-    try:
-        clf.fit(X, y)
-    except ValueError:
-        pass
+    return registered
 
-    return {'clf': clf, 'X':X, "y":y}
 
+# ---------------------------
+# Refresh Cache
+# ---------------------------
 
 def train_classifier():
     st.cache_resource.clear()
-    model_data = get_trained_model()
-    return bool(model_data)
+    return True
+
+
+# ---------------------------
+# Predict Attendance
+# ---------------------------
 
 def predict_attendance(class_image_np):
+
     encodings = get_face_embeddings(class_image_np)
 
     detected_student = {}
 
+    registered_students = get_registered_students()
 
-    model_data = get_trained_model()
-
-    if not model_data:
+    if len(registered_students) == 0:
         return detected_student, [], len(encodings)
-    
-    clf = model_data['clf']
-    X_train = model_data['X']
-    y_train = model_data['y']
 
-    all_students = sorted(list(set(y_train)))
+    all_students = [
+        student["student_id"]
+        for student in registered_students
+    ]
+
+    THRESHOLD = 0.60
 
     for encoding in encodings:
-        if len(all_students)>= 2:
-            predicted_id= int(clf.predict([encoding])[0])
-        else:
-            predicted_id = int(all_students[0])
 
-        student_embedding = X_train[y_train.index(predicted_id)]
+        best_distance = float("inf")
+        best_student = None
 
-        best_match_score = np.linalg.norm(student_embedding - encoding)
+        for student in registered_students:
 
-        resemblance_threshold = 0.6
+            distance = np.linalg.norm(
+                student["embedding"] - encoding
+            )
 
-        if best_match_score <= resemblance_threshold:
-            detected_student[predicted_id] = True
+            if distance < best_distance:
+                best_distance = distance
+                best_student = student["student_id"]
+
+        print("--------------------------------")
+        print("Best Match Student :", best_student)
+        print("Distance :", best_distance)
+
+        if best_distance <= THRESHOLD:
+
+            detected_student[int(best_student)] = True
+
     return detected_student, all_students, len(encodings)

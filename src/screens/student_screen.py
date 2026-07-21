@@ -111,11 +111,48 @@ def student_screen():
     st.space()
     
     show_registration = False
-    photo_source = st.camera_input("Position your face in the center")
+    
+    st.subheader("Choose Image Source")
 
+    # Set default selection
+    if "image_source" not in st.session_state:
+        st.session_state.image_source = "camera"
+
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        type1 = "primary" if st.session_state.image_source == "camera" else "tertiary"
+        if st.button(
+            "📷 Camera",
+            type=type1,
+            use_container_width=True
+        ):
+            st.session_state.image_source = "camera"
+            st.rerun()
+
+    with col2:
+        type2 = "primary" if st.session_state.image_source == "upload" else "tertiary"
+
+        if st.button(
+            "🖼 Upload Image",
+            type=type2,
+            use_container_width=True
+        ):
+            st.session_state.image_source = "upload"
+            st.rerun()
+            
+    photo_source = None
+    
+    if st.session_state.image_source == "camera":
+        photo_source = st.camera_input("Position your face in the center")
+    else:
+        photo_source = st.file_uploader(
+            "Upload Student Image",
+            type=["jpg", "jpeg", "png"]
+        )
     if photo_source:
-        img = np.array(Image.open(photo_source))
-
+        img = np.array(Image.open(photo_source).convert("RGB"))
+        
         with st.spinner('AI is scanning..'):
             detected, all_ids, num_faces = predict_attendance(img)
 
@@ -158,7 +195,7 @@ def student_screen():
             if st.button('Create Account', type='primary'):
                 if new_name:
                     with st.spinner('Creating profile..'):
-                        img = np.array(Image.open(photo_source))
+                        img = np.array(Image.open(photo_source).convert("RGB"))
                         encodings= get_face_embeddings(img)
                         if encodings:
                             face_emb = encodings[0].tolist()
